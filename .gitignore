@@ -1,0 +1,54 @@
+# Visual Studio / Rider / VS Code
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+.idea/
+.vscode/
+
+# Build results
+bin/
+obj/
+out/
+
+# Rider caches
+*.iml
+.idea/
+
+# .NET Core
+project.lock.json
+project.fragment.lock.json
+*.nuget.props
+*.nuget.targets
+*.nupkg
+*.dotCover
+*.dotCover.cache
+TestResults/
+*.dotCover
+
+# Resharper
+_ReSharper*/
+*.DotSettings.user
+
+# OS-generated files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Docker Compose / Docker secrets (optional)
+*.env
+docker-compose.override.yml
+
+# User-specific files
+*.local
+
+# EF Core Migrations (optional, if you want to ignore auto-generated snapshots)
+**/Migrations/*.Designer.cs
+**/Migrations/*.snapshot.cs
+
+# Packages
+*.nupkg
+packages/

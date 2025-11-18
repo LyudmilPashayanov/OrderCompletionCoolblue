@@ -1,0 +1,43 @@
+version: "3"
+services:
+  notification:
+    build:
+      context: ./src/OrderNotificationApi
+      dockerfile: Dockerfile
+      args:
+        # Replace with your exotic runtime
+        # E.g. if you use MX Mac it could be `linux-arm64`
+        RUNTIME: linux-x64
+    ports:
+      # If you use MX Mac, replace port 80 with port 8080 - you should also change this in the Dockerfile
+      # The Dockerfile can be found at <root>/src/OrderNotificationApi/Dockerfile
+      # Replace port 5002 with any other port if port 5002 is already in use in your machine
+      - "5002:80"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+  mySql:
+    container_name: ordering-mysql
+    image: mysql:8.0
+    ports:
+      # Replace left hand port 3306 with any other port if port 3306 is already in use on your machine
+      - "3306:3306"
+    command: ["--default-authentication-plugin=mysql_native_password"]
+    environment:
+      MYSQL_ROOT_PASSWORD: pass123
+    volumes:
+      - ./mysqllogs:/var/log/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 5s
+      retries: 5
+    restart: always
+  flywayMigration:
+    container_name: ordering-flyway-migration
+    image: flyway/flyway:latest
+    command: -url=jdbc:mysql://mySql?permitMysqlScheme=true -schemas=ordering -user=root -password=pass123 migrate
+    volumes:
+      - "./database/ordering/migrations:/flyway/sql"
+    depends_on:
+      mySql:
+        condition: service_healthy
+    restart: on-failure
