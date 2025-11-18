@@ -6,9 +6,13 @@ public static class OrderCompletionAdapter
 {
     public static void RegisterOrderCompletionAdapter(this IServiceCollection services, IConfiguration configuration)
     {
-        var settings = configuration.GetSection("OrderCompletionAdapterSettings").Get<OrderCompletionAdapterSettings>();
-        var connectionString = $"Server={settings.MySqlServerAddress};Port={settings.MySqlServerPort};Database={settings.MySqlDatabase};User Id={settings.MySqlUsername};Password={settings.MySqlPassword};";
+        services
+            .AddOptions<OrderCompletionAdapterSettings>()
+            .Bind(configuration.GetSection("OrderCompletionAdapterSettings"))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
 
-        services.AddTransient<IOrderCompletionRepository>((_) => new OrderCompletionRepository(connectionString));
+        services.AddSingleton<IMySqlConnectionFactory, MySqlConnectionFactory>();
+        services.AddScoped<IOrderCompletionRepository, OrderCompletionRepository>();
     }
 }

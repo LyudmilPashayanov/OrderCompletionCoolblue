@@ -33,7 +33,7 @@ public class OrderCompletionUseCaseTests
     }
 
     [Fact]
-    public void GivenOrderIsNotFullyDelivered_CompleteOrders_OrderIsNotCompleted()
+    public async Task GivenOrderIsNotFullyDelivered_CompleteOrders_OrderIsNotCompleted()
     {
         const int orderId = 2;
 
@@ -41,7 +41,7 @@ public class OrderCompletionUseCaseTests
 
         _sut.CompleteOrders([orderId]);
 
-        _orderCompletionRepository.Verify(x => x.CompleteOrder(orderId), Times.Never);
+        _orderCompletionRepository.Verify(x => x.TryCompleteOrderAsync(orderId, It.IsAny<CancellationToken>()), Times.Never);
         _notificationClientMock.Verify(x => x.OrderCompleted(orderId), Times.Never);
     }
 
