@@ -1,6 +1,5 @@
 ﻿using OrderCompletion.Api.Models;
 using Dapper;
-using MySql.Data.MySqlClient;
 using OrderCompletion.Api.Adapters.OrderCompletionAdapter.Dtos;
 using OrderCompletion.Api.Adapters.OrderCompletionAdapter.Mappers;
 using OrderCompletion.Api.Ports;
@@ -9,41 +8,56 @@ namespace OrderCompletion.Api.Adapters.OrderCompletionAdapter;
 
 internal class OrderCompletionRepository : IOrderCompletionRepository
 {
-    private readonly string _connectionString;
+    private readonly IMySqlConnectionFactory _mySqlConnectionFactory;
 
-    public OrderCompletionRepository(string connectionString)
+    public OrderCompletionRepository(IMySqlConnectionFactory connectionString)
     {
-        _connectionString = connectionString;
+        _mySqlConnectionFactory = connectionString;
     }
 
-    public void CompleteOrder(int orderId)
+    // TODO: Check how to do this query idempotent
+    public async Task<bool> TryCompleteOrderAsync(int orderId, CancellationToken ct)
     {
-        using (var connection = new MySqlConnection(_connectionString))
-        {
-            connection.Open();
+        await using var connection = _mySqlConnectionFactory.CreateConnection();
+        await connection.OpenAsync(ct);
 
-            var query = "UPDATE ORDERS SET OrderStateId = @OrderStateId WHERE Id = @Id";
-            connection.Execute(query, new { OrderStateId = (int)OrderState.Finished, Id = orderId });
-        }
+        const string query = @"
+        UPDATE ORDERS
+        SET OrderStateId = @OrderStateId
+        WHERE Id = @Id";
+
+        var parameters = new
+        {
+            OrderStateId = (int)OrderState.Finished,
+            Id = orderId
+        };
+
+        var affected = await connection.ExecuteAsync(
+            new CommandDefinition(query, parameters, cancellationToken: ct));
+
+            return affected == 1;
     }
 
-    public Order GetOrderById(int orderId)
+    public async Task<Order> GetOrderByIdAsync(int orderId, CancellationToken ct = default)
     {
-        using (var connection = new MySqlConnection(_connectionString))
-        {
-            connection.Open();
+        await using var connection = _mySqlConnectionFactory.CreateConnection();
+        await connection.OpenAsync(ct);
+        
+        // fetch order DTO
+        const string orderQuery = "SELECT * FROM ORDERS WHERE Id = @Id";
+        var orderDto = await connection.QuerySingleOrDefaultAsync<OrderDto>(
+            new CommandDefinition(orderQuery, new { Id = orderId }, cancellationToken: ct));
 
-            var orderQuery = "SELECT * FROM ORDERS WHERE Id = @Id";
-            var orderDto = connection.QuerySingleOrDefault<OrderDto>(orderQuery, new { Id = orderId });
+        if (orderDto == null)
+            return null;
 
-            if (orderDto == null) return null;
+        // fetch order lines
+        const string orderLinesQuery = "SELECT * FROM ORDER_LINES WHERE OrderId = @OrderId";
+        var orderLines = (await connection.QueryAsync<OrderLineDto>(
+                new CommandDefinition(orderLinesQuery, new { OrderId = orderId }, cancellationToken: ct)))
+            .AsList();
 
-            var orderLinesQuery = "SELECT * FROM ORDER_LINES WHERE OrderId = @OrderId";
-            var orderLines = connection.Query<OrderLineDto>(orderLinesQuery, new { OrderId = orderId }).ToList();
-
-            orderDto.OrderLines = orderLines;
-
-            return orderDto.ToDomain();
-        }
+        orderDto.OrderLines = orderLines;
+        return orderDto.ToDomain();
     }
 }

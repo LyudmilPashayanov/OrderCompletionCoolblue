@@ -4,7 +4,7 @@ namespace OrderCompletion.Api.Ports;
 
 public interface IOrderCompletionRepository
 {
-    Order GetOrderById(int orderId);
+    public Task<Order> GetOrderByIdAsync(int orderId, CancellationToken ct);
 
-    void CompleteOrder(int orderId);
+    public Task<bool> TryCompleteOrderAsync(int orderId, CancellationToken ct);
 }
