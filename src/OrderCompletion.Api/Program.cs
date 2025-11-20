@@ -9,7 +9,7 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 builder.Services.RegisterOrderCompletionAdapter(builder.Configuration);
-builder.Services.RegisterNotificationAdapter();
+builder.Services.RegisterNotificationAdapter(builder.Configuration);
 builder.Services.RegisterDomainUseCases();
 builder.Services.RegisterCors(builder.Configuration);
 

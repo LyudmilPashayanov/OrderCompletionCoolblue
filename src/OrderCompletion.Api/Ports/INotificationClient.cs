@@ -2,5 +2,5 @@
 
 public interface INotificationClient
 {
-    void OrderCompleted(int orderId);
+    Task<bool> NotifyOrderCompletedAsync(int orderId, CancellationToken ct);
 }
