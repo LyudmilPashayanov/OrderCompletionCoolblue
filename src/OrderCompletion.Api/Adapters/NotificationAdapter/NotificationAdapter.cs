@@ -13,9 +13,7 @@ public static class NotificationAdapter
             .Bind(configuration.GetSection("NotificationClientSettings"))
             .ValidateDataAnnotations()
             .ValidateOnStart();
-
-        services.AddTransient<INotificationClient, NotificationClient>();
-
+        
         services.AddHttpClient<INotificationClient, NotificationClient>((serviceProvider, client) =>
         {
             NotificationAdapterSettings notificationSettings =
