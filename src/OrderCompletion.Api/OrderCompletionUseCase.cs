@@ -65,10 +65,8 @@ public class OrderCompletionUseCase : IOrderCompletionUseCase
             await _notifyRetryPolicy.ExecuteAsync(async (context, token) =>
             {
                 //_logger.LogDebug("Notifying external service that Order {OrderId} is complete", orderId);
-                await _notificationClient.NotifyOrderCompletedAsync(orderId, token);
+               notified = await _notificationClient.NotifyOrderCompletedAsync(orderId, token);
             }, new Context(), ct);
-
-            notified = true;
         }
         //TODO: Maybe have some custom exceptions.
         //catch (PermanentNotificationException pex)

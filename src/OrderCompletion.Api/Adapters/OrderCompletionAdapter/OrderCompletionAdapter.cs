@@ -1,4 +1,5 @@
 ﻿using OrderCompletion.Api.Ports;
+using OrderCompletion.Api.Utilities;
 
 namespace OrderCompletion.Api.Adapters.OrderCompletionAdapter;
 
@@ -12,6 +13,7 @@ public static class OrderCompletionAdapter
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
+        services.AddSingleton<ISystemClock, SystemClock>();
         services.AddSingleton<IMySqlConnectionFactory, MySqlConnectionFactory>();
         services.AddScoped<IOrderCompletionRepository, OrderCompletionRepository>();
     }

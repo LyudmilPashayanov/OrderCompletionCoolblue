@@ -1,35 +1,51 @@
 ﻿using Moq;
 using OrderCompletion.Api.Models;
+using OrderCompletion.Api.OrderUseCaseRequirements;
 using OrderCompletion.Api.Ports;
+using OrderCompletion.Api.Utilities;
+using Polly;
 using Xunit;
 
 namespace OrderCompletion.Api.Unit.Tests.UseCases;
 
 public class OrderCompletionUseCaseTests
 {
-    private static readonly DateTime Yesterday = DateTime.UtcNow.AddDays(-1);
-    private static readonly DateTime Yesteryear = DateTime.UtcNow.AddYears(-1);
+    private static readonly DateTime FixedNow = new DateTime(2025, 11, 20, 12, 0, 0, DateTimeKind.Utc);
+
+    private readonly IAsyncPolicy _noOpPolicy = Policy.NoOpAsync(); // no retries in unit tests TODO: maybe we need to retry in unit tests?
 
     private readonly Mock<IOrderCompletionRepository> _orderCompletionRepository = new();
     private readonly Mock<INotificationClient> _notificationClientMock = new();
-    private readonly IOrderCompletionUseCase _sut;
-
-    public OrderCompletionUseCaseTests()
+    private readonly Mock<ISystemClock> _clockMock = new();
+    
+    private IOrderCompletionUseCase CreateSut(params IOrderRequirement[] requirements)
     {
-        _sut = new OrderCompletionUseCase(_orderCompletionRepository.Object, _notificationClientMock.Object);
+        return new OrderCompletionUseCase(
+            _orderCompletionRepository.Object,
+            _notificationClientMock.Object,
+            requirements,
+            _noOpPolicy);
     }
 
     [Fact]
-    public void GivenRecentOrder_CompleteOrders_OrderIsNotCompleted()
+    public async Task GivenRecentOrder_CompleteOrders_OrderIsNotCompleted()
     {
+        //Arrange
         const int orderId = 1;
-
         SetupRecentOrder(orderId);
-
-        _sut.CompleteOrders([orderId]);
-
-        _orderCompletionRepository.Verify(x => x.CompleteOrder(orderId), Times.Never);
-        _notificationClientMock.Verify(x => x.OrderCompleted(orderId), Times.Never);
+        
+        var reqDelivered = new FullyDeliveredRequirements();
+        var reqAge = new OrderAgeRequirement(_clockMock.Object);
+        IOrderCompletionUseCase sut = CreateSut(reqDelivered, reqAge);
+        
+        _clockMock.Setup(c => c.UtcNow).Returns(FixedNow);
+        
+        //Act
+        await sut.CompleteOrdersAsync(new [] {orderId}, CancellationToken.None);
+        
+        // Assert
+        _orderCompletionRepository.Verify(x => x.CompleteOrderAsync(orderId, It.IsAny<CancellationToken>()), Times.Never);
+        _notificationClientMock.Verify(x => x.NotifyOrderCompletedAsync(orderId, It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -38,50 +54,97 @@ public class OrderCompletionUseCaseTests
         const int orderId = 2;
 
         SetupIncompleteOrder(orderId);
+        
+        var reqDelivered = new FullyDeliveredRequirements();
+        var reqAge = new OrderAgeRequirement(_clockMock.Object);
+        IOrderCompletionUseCase sut = CreateSut(reqDelivered, reqAge);
+        
+        _clockMock.Setup(c => c.UtcNow).Returns(FixedNow);
+        
+        await sut.CompleteOrdersAsync([orderId], CancellationToken.None);
 
-        _sut.CompleteOrders([orderId]);
-
-        _orderCompletionRepository.Verify(x => x.TryCompleteOrderAsync(orderId, It.IsAny<CancellationToken>()), Times.Never);
-        _notificationClientMock.Verify(x => x.OrderCompleted(orderId), Times.Never);
+        _orderCompletionRepository.Verify(x => x.CompleteOrderAsync(orderId, It.IsAny<CancellationToken>()), Times.Never);
+        _notificationClientMock.Verify(x => x.NotifyOrderCompletedAsync(orderId, It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
-    public void GivenOldOrderIsFullyDelivered_CompleteOrders_OrderCompleted()
+    public async Task GivenOldOrderIsFullyDelivered_CompleteOrders_OrderCompleted()
     {
         const int orderId = 3;
-
         SetupOldCompletedOrder(orderId);
+        
+        _clockMock.Setup(c => c.UtcNow).Returns(FixedNow);
 
-        _sut.CompleteOrders([orderId]);
+        _notificationClientMock
+            .Setup(n => n.NotifyOrderCompletedAsync(orderId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+        
+        var reqDelivered = new FullyDeliveredRequirements();
+        var reqAge = new OrderAgeRequirement(_clockMock.Object);
+        IOrderCompletionUseCase sut = CreateSut(reqDelivered, reqAge);
+        
+        
+        await sut.CompleteOrdersAsync([orderId], CancellationToken.None);
 
-        _orderCompletionRepository.Verify(x => x.CompleteOrder(orderId), Times.Once);
-        _notificationClientMock.Verify(x => x.OrderCompleted(orderId), Times.Once);
+        _orderCompletionRepository.Verify(x => x.CompleteOrderAsync(orderId, It.IsAny<CancellationToken>()), Times.Once);
+        _notificationClientMock.Verify(x => x.NotifyOrderCompletedAsync(orderId, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
-    public void GivenMultipleOrders_CompleteOrders_OnlyOldFullyDeliveredOrdersAreCompleted()
+    public async Task GivenMultipleOrders_CompleteOrders_OnlyOldFullyDeliveredOrdersAreCompleted()
     {
         SetupOldCompletedOrder(1);
         SetupRecentOrder(2);
         SetupOldCompletedOrder(3);
         SetupIncompleteOrder(4);
+        
+        _notificationClientMock
+            .Setup(n => n.NotifyOrderCompletedAsync(It.IsIn(1, 3), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+        
+        var reqDelivered = new FullyDeliveredRequirements();
+        var reqAge = new OrderAgeRequirement(_clockMock.Object);
+        IOrderCompletionUseCase sut = CreateSut(reqDelivered, reqAge);
+        
+        _clockMock.Setup(c => c.UtcNow).Returns(FixedNow);
 
-        _sut.CompleteOrders([1, 2, 3, 4]);
+        await sut.CompleteOrdersAsync([1, 2, 3, 4], CancellationToken.None);
 
-        _orderCompletionRepository.Verify(x => x.CompleteOrder(It.IsIn(1, 3)), Times.Exactly(2));
-        _orderCompletionRepository.Verify(x => x.CompleteOrder(It.IsNotIn(1, 3)), Times.Never);
-        _notificationClientMock.Verify(x => x.OrderCompleted(It.IsIn(1, 3)), Times.Exactly(2));
-        _notificationClientMock.Verify(x => x.OrderCompleted(It.IsNotIn(1, 3)), Times.Never);
+        _orderCompletionRepository.Verify(x => x.CompleteOrderAsync(It.IsIn(1, 3), It.IsAny<CancellationToken>()), Times.Exactly(2));
+        _orderCompletionRepository.Verify(x => x.CompleteOrderAsync(It.IsNotIn(1, 3), It.IsAny<CancellationToken>()), Times.Never);
+        _notificationClientMock.Verify(x => x.NotifyOrderCompletedAsync(It.IsIn(1, 3), It.IsAny<CancellationToken>()), Times.Exactly(2));
+        _notificationClientMock.Verify(x => x.NotifyOrderCompletedAsync(It.IsNotIn(1, 3), It.IsAny<CancellationToken>()), Times.Never);
     }
 
+    [Fact]
+    public async Task GivenNotificationFails_OrderIsNotMarkedCompleted()
+    {
+        const int orderId = 4;
+        SetupOldCompletedOrder(orderId);
+
+        // Notification fails (returns false)
+        _notificationClientMock
+            .Setup(n => n.NotifyOrderCompletedAsync(orderId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+
+        _clockMock.Setup(c => c.UtcNow).Returns(FixedNow);
+
+        var sut = CreateSut(new FullyDeliveredRequirements(), new OrderAgeRequirement(_clockMock.Object));
+
+        await sut.CompleteOrdersAsync(new[] { orderId }, CancellationToken.None);
+
+        _notificationClientMock.Verify(x => x.NotifyOrderCompletedAsync(orderId, It.IsAny<CancellationToken>()), Times.Once);
+        _orderCompletionRepository.Verify(x => x.CompleteOrderAsync(orderId, It.IsAny<CancellationToken>()), Times.Never);
+    }
+    
     private void SetupRecentOrder(int orderId)
     {
         _orderCompletionRepository
-            .Setup(x => x.GetOrderById(orderId))
-            .Returns(new Order
+            .Setup(x => x.GetOrderByIdAsync(orderId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Order
             {
                 Id = orderId,
-                OrderDate = Yesterday,
+                OrderDate = FixedNow.AddDays(-1),
                 OrderLines =
                 [
                     new OrderLine { ProductId = 1, OrderedQuantity = 10, DeliveredQuantity = 10 }
@@ -92,12 +155,12 @@ public class OrderCompletionUseCaseTests
     private void SetupIncompleteOrder(int orderId)
     {
         _orderCompletionRepository
-            .Setup(x => x.GetOrderById(orderId))
-            .Returns(new Order
+            .Setup(x => x.GetOrderByIdAsync(orderId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Order
             {
                 Id = orderId,
                 OrderState = OrderState.Submitted,
-                OrderDate = Yesteryear,
+                OrderDate = FixedNow.AddYears(-1),
                 OrderLines =
                 [
                     new OrderLine { ProductId = 1, OrderedQuantity = 10, DeliveredQuantity = 10 },
@@ -109,16 +172,16 @@ public class OrderCompletionUseCaseTests
     private void SetupOldCompletedOrder(int orderId)
     {
         _orderCompletionRepository
-            .Setup(x => x.GetOrderById(orderId))
-            .Returns(new Order
+            .Setup(x => x.GetOrderByIdAsync(orderId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Order
             {
                 Id = orderId,
                 OrderState = OrderState.Submitted,
-                OrderDate = Yesteryear,
+                OrderDate = FixedNow.AddYears(-1),
                 OrderLines =
                 [
                     new OrderLine { ProductId = 1, OrderedQuantity = 10, DeliveredQuantity = 10 },
-                    new OrderLine { ProductId = 2, OrderedQuantity = 2, DeliveredQuantity = 2}
+                    new OrderLine { ProductId = 2, OrderedQuantity = 2, DeliveredQuantity = 2 }
                 ]
             });
     }
