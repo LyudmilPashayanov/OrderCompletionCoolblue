@@ -1,4 +1,5 @@
-﻿using OrderCompletion.Api.Ports;
+﻿using OrderCompletion.Api.OrderUseCaseRequirements;
+using OrderCompletion.Api.Ports;
 
 namespace OrderCompletion.Api.Extensions;
 
@@ -6,6 +7,8 @@ public static class DomainExtensions
 {
     public static void RegisterDomainUseCases(this IServiceCollection services)
     {
-        services.AddTransient<IOrderCompletionUseCase, OrderCompletionUseCase>();
+        services.AddSingleton<IOrderRequirement, FullyDeliveredRequirements>();
+        services.AddSingleton<IOrderRequirement, OrderAgeRequirement>();
+        services.AddScoped<IOrderCompletionUseCase, OrderCompletionUseCase>();
     }
 }

@@ -10,21 +10,23 @@ internal class OrderCompletionRepository : IOrderCompletionRepository
 {
     private readonly IMySqlConnectionFactory _mySqlConnectionFactory;
 
-    public OrderCompletionRepository(IMySqlConnectionFactory connectionString)
+    public OrderCompletionRepository(IMySqlConnectionFactory mySqlConnectionFactory)
     {
-        _mySqlConnectionFactory = connectionString;
+        _mySqlConnectionFactory = mySqlConnectionFactory;
     }
-
-    // TODO: Check how to do this query idempotent
-    public async Task<bool> TryCompleteOrderAsync(int orderId, CancellationToken ct)
+    
+    //TODO: Add error handling.
+    //TODO: Add logging
+    public async Task<bool> CompleteOrderAsync(int orderId, CancellationToken ct)
     {
         await using var connection = _mySqlConnectionFactory.CreateConnection();
         await connection.OpenAsync(ct);
-
+        
         const string query = @"
         UPDATE ORDERS
         SET OrderStateId = @OrderStateId
-        WHERE Id = @Id";
+        WHERE Id = @Id
+          AND OrderStateId != @OrderStateId;";
 
         var parameters = new
         {
@@ -35,25 +37,40 @@ internal class OrderCompletionRepository : IOrderCompletionRepository
         var affected = await connection.ExecuteAsync(
             new CommandDefinition(query, parameters, cancellationToken: ct));
 
-            return affected == 1;
+        // affected == 1 -> we successfully moved it to Finished just now
+        // affected == 0 -> it was already Finished (or the row doesn't exist)
+        return affected == 1;
     }
 
-    public async Task<Order> GetOrderByIdAsync(int orderId, CancellationToken ct = default)
+    //TODO: Add error handling.
+    //TODO: Add logging
+    public async Task<Order?> GetOrderByIdAsync(int orderId, CancellationToken ct = default)
     {
         await using var connection = _mySqlConnectionFactory.CreateConnection();
         await connection.OpenAsync(ct);
         
         // fetch order DTO
-        const string orderQuery = "SELECT * FROM ORDERS WHERE Id = @Id";
-        var orderDto = await connection.QuerySingleOrDefaultAsync<OrderDto>(
+        const string orderQuery = @"
+        SELECT orders.Id, orders.OrderDate, orders.OrderStateId 
+        FROM ORDERS orders 
+        WHERE orders.Id = @Id;";
+        
+        OrderDto? orderDto = await connection.QuerySingleOrDefaultAsync<OrderDto>(
             new CommandDefinition(orderQuery, new { Id = orderId }, cancellationToken: ct));
 
         if (orderDto == null)
+        {
+            //TODO: Add error handling.
             return null;
+        }
 
         // fetch order lines
-        const string orderLinesQuery = "SELECT * FROM ORDER_LINES WHERE OrderId = @OrderId";
-        var orderLines = (await connection.QueryAsync<OrderLineDto>(
+        const string orderLinesQuery = @"
+        SELECT line.Id, line.ProductId, line.OrderedQuantity, line.DeliveredQuantity 
+        FROM ORDER_LINES line 
+        WHERE OrderId = @OrderId";
+        
+        List<OrderLineDto> orderLines = (await connection.QueryAsync<OrderLineDto>(
                 new CommandDefinition(orderLinesQuery, new { OrderId = orderId }, cancellationToken: ct)))
             .AsList();
 

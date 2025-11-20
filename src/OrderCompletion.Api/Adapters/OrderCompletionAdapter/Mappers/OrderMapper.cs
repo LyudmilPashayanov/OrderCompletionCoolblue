@@ -13,7 +13,7 @@ public static class OrderMapper
         OrderLines = orderDto.OrderLines.Select(ol => ol.ToDomain()).ToList()
     };
 
-    public static OrderLine ToDomain(this OrderLineDto orderLineDto) => new OrderLine
+    private static OrderLine ToDomain(this OrderLineDto orderLineDto) => new OrderLine
     {
         Id = orderLineDto.Id,
         ProductId = orderLineDto.ProductId,

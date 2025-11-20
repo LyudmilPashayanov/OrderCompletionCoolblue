@@ -7,19 +7,19 @@ namespace OrderCompletion.Api.Controllers;
 [Route("[controller]")]
 public class OrdersController : ControllerBase
 {
-    private readonly IOrderCompletionUseCase _usecase;
+    private readonly IOrderCompletionUseCase _orderCompleteUsecase;
     private readonly ILogger<OrdersController> _logger;
 
-    public OrdersController(IOrderCompletionUseCase usecase, ILogger<OrdersController> logger)
+    public OrdersController(IOrderCompletionUseCase orderCompleteUsecase, ILogger<OrdersController> logger)
     {
-        _usecase = usecase;
+        _orderCompleteUsecase = orderCompleteUsecase;
         _logger = logger;
     }
 
     [HttpPost(Name = "Complete")]
-    public ActionResult Complete(List<int> orderIds)
+    public async Task<IActionResult> Complete(List<int> orderIds, CancellationToken ct)
     {
-        _usecase.CompleteOrders(orderIds);
+        await _orderCompleteUsecase.CompleteOrdersAsync(orderIds, ct);
 
         return Ok();
     }
