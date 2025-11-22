@@ -13,7 +13,7 @@ public static class NotificationAdapter
             .Bind(configuration.GetSection("NotificationClientSettings"))
             .ValidateDataAnnotations()
             .ValidateOnStart();
-        
+
         services.AddHttpClient<INotificationClient, NotificationClient>((serviceProvider, client) =>
         {
             NotificationAdapterSettings notificationSettings =
@@ -21,13 +21,15 @@ public static class NotificationAdapter
             client.BaseAddress = new Uri(notificationSettings.NotificationsAddress);
         });
 
-        services.AddSingleton<IAsyncPolicy>(serviceProvider =>
+        services.AddSingleton<IAsyncPolicy<HttpResponseMessage>>(serviceProvider =>
         {
             NotificationAdapterSettings notificationSettings =
                 serviceProvider.GetRequiredService<IOptions<NotificationAdapterSettings>>().Value;
-            return Policy
-                .Handle<HttpRequestException>() // retry on HTTP failures
-                .Or<TaskCanceledException>() // retry on timeouts
+
+            return Policy<HttpResponseMessage>
+                .Handle<HttpRequestException>()
+                .Or<TaskCanceledException>()
+                .OrResult(response => (int)response.StatusCode >= 500) // retry on 500, because notification service returns that on fail.
                 .WaitAndRetryAsync(
                     retryCount: notificationSettings.RetryCount,
                     sleepDurationProvider: attempt => TimeSpan.FromSeconds(notificationSettings.RetrySecondsTimeout)

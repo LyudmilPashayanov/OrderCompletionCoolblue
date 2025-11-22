@@ -15,7 +15,7 @@ public class FullyDeliveredRequirements : IOrderRequirement
 
         if (order.OrderLines.All(line =>
                 line.DeliveredQuantity.HasValue &&
-                line.DeliveredQuantity == line.OrderedQuantity))
+                line.DeliveredQuantity >= line.OrderedQuantity))
         {
             return true;
         }

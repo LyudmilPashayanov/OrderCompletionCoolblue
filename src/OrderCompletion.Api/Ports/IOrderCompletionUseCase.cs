@@ -2,5 +2,5 @@
 
 public interface IOrderCompletionUseCase
 {
-    Task CompleteOrdersAsync(IReadOnlyCollection<int> orderIds, CancellationToken ct);
+    Task<CompleteOrdersResponse> CompleteOrdersAsync(IReadOnlyCollection<int> orderIds, CancellationToken ct);
 }

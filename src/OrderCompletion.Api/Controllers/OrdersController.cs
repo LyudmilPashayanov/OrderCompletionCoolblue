@@ -8,19 +8,29 @@ namespace OrderCompletion.Api.Controllers;
 public class OrdersController : ControllerBase
 {
     private readonly IOrderCompletionUseCase _orderCompleteUsecase;
-    private readonly ILogger<OrdersController> _logger;
 
-    public OrdersController(IOrderCompletionUseCase orderCompleteUsecase, ILogger<OrdersController> logger)
+    public OrdersController(IOrderCompletionUseCase orderCompleteUsecase)
     {
         _orderCompleteUsecase = orderCompleteUsecase;
-        _logger = logger;
     }
 
     [HttpPost(Name = "Complete")]
     public async Task<IActionResult> Complete(List<int> orderIds, CancellationToken ct)
     {
-        await _orderCompleteUsecase.CompleteOrdersAsync(orderIds, ct);
-
-        return Ok();
+        CompleteOrdersResponse response = await _orderCompleteUsecase.CompleteOrdersAsync(orderIds, ct);
+        
+        if (response.OrdersSuccessfullyUpdated == false || 
+            response.SuccessfullyNotifiedOrders.Count == 0)
+        {
+            return BadRequest(new
+            {
+                Message = "None of the requested orders were updated successfully.",
+                response.SuccessfullyNotifiedOrders,
+                response.UnsuccessfullyNotifiedOrders,
+                response.FailedToUpdateOrders
+            });
+        }
+        
+        return Ok(response);
     }
 }
