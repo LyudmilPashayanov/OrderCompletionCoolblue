@@ -26,22 +26,22 @@ public class OrderCompletionUseCase : IOrderCompletionUseCase
 
     public async Task CompleteOrdersAsync(IReadOnlyCollection<int> orderIds, CancellationToken ct)
     {
-        foreach (var orderId in orderIds)
-        {    
-            ct.ThrowIfCancellationRequested(); // This will gracefully stop the loop, when the token has been canceled.
-            
-            Order? order = await GetOrderByIdAsync(orderId, ct);
-            if (order == null)
+        //TODO: Possible optimization- Check if 10,000 order Ids, split batches of 1000. Then for each batch ...
+        
+            List<Order> orders = await _orderCompletionRepository.GetOrdersByIdAsync(orderIds, ct);
+            if (orders.Count == 0)
             {
-                continue; // Order doesn't exist or has already finished, skip it...
+                // no orders found. send an error.
+                continue;
             }
-           
-            // Business logic to check if order can be completed
-            if (VerifyOrderRequirements(order, _requirements) == false)
+
+            foreach (var order in orders)
             {
-                continue; // Order doesn't fulfil all the requirements. 
+                if (VerifyOrderRequirements(order, _requirements) == false)
+                {
+                    continue; // Order doesn't fulfil all the requirements. 
+                }
             }
-            
 
             // Execute notification service
             bool isNotificationSuccessful = await ExecuteOrderNotificationAsync(orderId, ct);
@@ -54,12 +54,13 @@ public class OrderCompletionUseCase : IOrderCompletionUseCase
             }
             
             // TODO: Populate the body for the API request with every order which failed or succeeded
-        }
+        
     }
 
     private async Task<bool> ExecuteOrderNotificationAsync(int orderId, CancellationToken ct)
     { 
         bool notified = false;
+        
         try
         {
             await _notifyRetryPolicy.ExecuteAsync(async (context, token) =>
@@ -94,22 +95,5 @@ public class OrderCompletionUseCase : IOrderCompletionUseCase
         }
 
         return true;
-    }
-    
-    private async Task<Order?> GetOrderByIdAsync(int id, CancellationToken ct)
-    {
-        Order? order = await _orderCompletionRepository.GetOrderByIdAsync(id, ct);
-        if (order == null)
-        {
-            // _logger.LogWarning("No order with OrderId:{OrderId} found in the repository.");
-            return null;
-        }
-        if (order.OrderState == OrderState.Finished)
-        {
-            //_logger.LogInformation("Order {OrderId} already finished; skipping.", id);
-            return null;
-        }
-
-        return order;
     }
 }

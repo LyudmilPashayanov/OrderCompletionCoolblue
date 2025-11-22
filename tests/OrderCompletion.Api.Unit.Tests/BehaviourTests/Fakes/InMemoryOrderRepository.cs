@@ -9,7 +9,7 @@ public class InMemoryOrderRepository : IOrderCompletionRepository
     
     public void Populate(Order order) => _store[order.Id] = Clone(order);
     
-    public Task<Order?> GetOrderByIdAsync(int orderId, CancellationToken ct = default)
+    public Task<Order?> GetOrdersByIdAsync(int orderId, CancellationToken ct = default)
     {
         _store.TryGetValue(orderId, out var order);
         return Task.FromResult(order is null ? null : Clone(order)); 

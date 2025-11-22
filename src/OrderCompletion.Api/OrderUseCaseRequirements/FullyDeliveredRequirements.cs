@@ -4,18 +4,27 @@ namespace OrderCompletion.Api.OrderUseCaseRequirements;
 
 public class FullyDeliveredRequirements : IOrderRequirement
 {
+    private string _failureReason = String.Empty; 
     public bool Fulfils(Order order)
     {
         if (order.OrderLines.Count == 0)
         {
-            //TODO: Special case where there is an order without any order lines. Maybe raise a special exception or add logging here?
+            _failureReason = "No order lines were found in that order";
             return false;
         }
-        
-        return order.OrderLines.All(line => 
-            line.DeliveredQuantity.HasValue && 
-            line.DeliveredQuantity == line.OrderedQuantity);
+
+        if (order.OrderLines.All(line =>
+                line.DeliveredQuantity.HasValue &&
+                line.DeliveredQuantity == line.OrderedQuantity))
+        {
+            return true;
+        }
+        else
+        {
+            _failureReason = "All order lines must be fully delivered";
+            return false;
+        }
     }
     
-    public string FailureReason => "All order lines must be fully delivered";
+    public string FailureReason => _failureReason;
 }

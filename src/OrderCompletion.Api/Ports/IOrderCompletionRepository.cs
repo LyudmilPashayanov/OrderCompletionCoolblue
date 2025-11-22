@@ -4,7 +4,7 @@ namespace OrderCompletion.Api.Ports;
 
 public interface IOrderCompletionRepository
 {
-    public Task<Order?> GetOrderByIdAsync(int orderId, CancellationToken ct = default);
+    public Task<List<Order>> GetOrdersByIdAsync(IReadOnlyCollection<int> orderIds, CancellationToken ct = default);
 
-    public Task<bool> CompleteOrderAsync(int orderId, CancellationToken ct = default);
+    public Task<int> CompleteOrdersAsync(IReadOnlyCollection<int> orderIds, CancellationToken ct = default);
 }

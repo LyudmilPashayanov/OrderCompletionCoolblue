@@ -140,7 +140,7 @@ public class OrderCompletionUseCaseTests
     private void SetupRecentOrder(int orderId)
     {
         _orderCompletionRepository
-            .Setup(x => x.GetOrderByIdAsync(orderId, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetOrdersByIdAsync(orderId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Order
             {
                 Id = orderId,
@@ -155,7 +155,7 @@ public class OrderCompletionUseCaseTests
     private void SetupIncompleteOrder(int orderId)
     {
         _orderCompletionRepository
-            .Setup(x => x.GetOrderByIdAsync(orderId, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetOrdersByIdAsync(orderId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Order
             {
                 Id = orderId,
@@ -172,7 +172,7 @@ public class OrderCompletionUseCaseTests
     private void SetupOldCompletedOrder(int orderId)
     {
         _orderCompletionRepository
-            .Setup(x => x.GetOrderByIdAsync(orderId, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetOrdersByIdAsync(orderId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Order
             {
                 Id = orderId,

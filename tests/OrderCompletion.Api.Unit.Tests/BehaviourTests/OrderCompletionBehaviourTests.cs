@@ -38,7 +38,7 @@ public class OrderCompletionBehaviourTests
         await sut.CompleteOrdersAsync(new[] { 1 }, CancellationToken.None);
 
         // Assert - read the same repository state and fake notifier
-        var updated = await repo.GetOrderByIdAsync(1, CancellationToken.None);
+        var updated = await repo.GetOrdersByIdAsync(1, CancellationToken.None);
         Assert.Equal(OrderState.Finished, updated!.OrderState);
         Assert.Contains(1, notification.Notified);
     }
