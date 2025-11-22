@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging.Abstractions;
 using OrderCompletion.Api.Models;
 using OrderCompletion.Api.OrderUseCaseRequirements;
 using OrderCompletion.Api.Unit.Tests.BehaviourTests.Fakes;
@@ -31,15 +32,22 @@ public class OrderCompletionBehaviourTests
         var sut = new OrderCompletionUseCase(
             repo, 
             notification, 
-            new IOrderRequirement[] { new FullyDeliveredRequirements(), new OrderAgeRequirement(clock) },
-            Policy.NoOpAsync());
+            new IOrderRequirement[] 
+                { 
+                    new FullyDeliveredRequirements(), 
+                    new OrderAgeRequirement(clock),
+                    new OrderNotFinishedRequirement()
+                },
+            NullLogger<OrderCompletionUseCase>.Instance);
 
         // Act
         await sut.CompleteOrdersAsync(new[] { 1 }, CancellationToken.None);
 
         // Assert - read the same repository state and fake notifier
-        var updated = await repo.GetOrdersByIdAsync(1, CancellationToken.None);
-        Assert.Equal(OrderState.Finished, updated!.OrderState);
+        var updated = await repo.GetOrdersByIdAsync(new[] {1}, CancellationToken.None);
+        var order = updated.Single();
+
+        Assert.Equal(OrderState.Finished, order.OrderState);
         Assert.Contains(1, notification.Notified);
     }
 }

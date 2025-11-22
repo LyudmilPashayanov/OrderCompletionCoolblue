@@ -34,11 +34,16 @@ public class OrderCompletionUseCase : IOrderCompletionUseCase
         {
             List<Order> orders = await GetOrdersAsync(orderIds, ct);
 
-            NotificationResults notificationResults = await VerifyAndNotifyOrders(orders, ct);
-            PopulateResponseNotificationResults(response, notificationResults);
+            VerificationAndNotificationResults verificationAndNotificationResults = await VerifyAndNotifyOrders(orders, ct);
+            PopulateResponseNotificationResults(response, verificationAndNotificationResults);
             
-            bool ordersSuccessfullyUpdated = await UpdateOrdersState(notificationResults.SuccessfullyNotifiedOrders, ct);
-            PopulateResponseUpdateOrdersResults(response, notificationResults, ordersSuccessfullyUpdated);
+            bool ordersSuccessfullyUpdated = await UpdateOrdersState(verificationAndNotificationResults.SuccessfullyNotifiedOrders, ct);
+            PopulateResponseUpdateOrdersResults(response, verificationAndNotificationResults, ordersSuccessfullyUpdated);
+        }
+        catch (NoOrdersFoundException ex)
+        {
+            _logger.LogWarning(ex, "No orders found for ids: {OrderIds}", ex.RequestedIds);
+            response.UnsuccessfullyNotifiedOrders = ex.RequestedIds.ToList();
         }
         catch (NoOrdersSuccessfullyNotifiedException ex)
         {
@@ -70,15 +75,15 @@ public class OrderCompletionUseCase : IOrderCompletionUseCase
         if (orders.Count == 0)
         {
             _logger.LogWarning("No orders found with ids: {OrderIds}.", orderIds);
-            throw new Exception("No orders found with ids.");
+            throw new NoOrdersFoundException(orderIds);
         }
 
         return orders;
     }
 
-    private async Task<NotificationResults> VerifyAndNotifyOrders(List<Order> orders, CancellationToken ct = default)
+    private async Task<VerificationAndNotificationResults> VerifyAndNotifyOrders(List<Order> orders, CancellationToken ct = default)
     {
-        NotificationResults notificationResults = new NotificationResults();
+        VerificationAndNotificationResults verificationAndNotificationResults = new VerificationAndNotificationResults();
         
         foreach (var order in orders)
         {
@@ -90,21 +95,26 @@ public class OrderCompletionUseCase : IOrderCompletionUseCase
                 
                 if (notifiedSuccessfully)
                 {
-                    notificationResults.SuccessfullyNotifiedOrders.Add(order.Id);
+                    verificationAndNotificationResults.SuccessfullyNotifiedOrders.Add(order.Id);
                 }
                 else
                 {
-                    notificationResults.UnsuccessfullyNotifiedOrders.Add(order.Id);
+                    verificationAndNotificationResults.UnsuccessfullyNotifiedOrders.Add(order.Id);
                 }
+            }
+            else
+            {
+                verificationAndNotificationResults.FailedRequirementsOrders.Add(order.Id);
+                _logger.LogWarning("Order with Id: {OrderId}, failed to meet all requirements and will not be marked as completed.",order.Id);
             }
         }
 
-        if (notificationResults.SuccessfullyNotifiedOrders.Count == 0)
+        if (verificationAndNotificationResults.SuccessfullyNotifiedOrders.Count == 0)
         {
-            throw new NoOrdersSuccessfullyNotifiedException(notificationResults.UnsuccessfullyNotifiedOrders);
+            throw new NoOrdersSuccessfullyNotifiedException(verificationAndNotificationResults.UnsuccessfullyNotifiedOrders);
         }
         
-        return notificationResults;
+        return verificationAndNotificationResults;
     }
 
     private async Task<bool> UpdateOrdersState(List<int> successfullyNotifiedOrders, CancellationToken ct)
@@ -151,18 +161,19 @@ public class OrderCompletionUseCase : IOrderCompletionUseCase
     }
     
     private void PopulateResponseNotificationResults(CompleteOrdersResponse responseToPopulate,
-        NotificationResults notificationResults)
+        VerificationAndNotificationResults verificationAndNotificationResults)
     {
-        responseToPopulate.SuccessfullyNotifiedOrders = notificationResults.SuccessfullyNotifiedOrders;
-        responseToPopulate.UnsuccessfullyNotifiedOrders = notificationResults.UnsuccessfullyNotifiedOrders;
+        responseToPopulate.SuccessfullyNotifiedOrders = verificationAndNotificationResults.SuccessfullyNotifiedOrders;
+        responseToPopulate.UnsuccessfullyNotifiedOrders = verificationAndNotificationResults.UnsuccessfullyNotifiedOrders;
+        responseToPopulate.FailedToUpdateOrders = verificationAndNotificationResults.FailedRequirementsOrders;
     }
     
-    private void PopulateResponseUpdateOrdersResults(CompleteOrdersResponse responseToPopulate, NotificationResults notificationResults, bool ordersSuccessfullyUpdated)
+    private void PopulateResponseUpdateOrdersResults(CompleteOrdersResponse responseToPopulate, VerificationAndNotificationResults verificationAndNotificationResults, bool ordersSuccessfullyUpdated)
     {
         responseToPopulate.OrdersSuccessfullyUpdated = ordersSuccessfullyUpdated;
         if (!ordersSuccessfullyUpdated)
         {
-            responseToPopulate.FailedToUpdateOrders = notificationResults.SuccessfullyNotifiedOrders;
+            responseToPopulate.FailedToUpdateOrders = verificationAndNotificationResults.SuccessfullyNotifiedOrders;
         }
     }
 }
