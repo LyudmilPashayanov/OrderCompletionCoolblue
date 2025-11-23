@@ -12,7 +12,17 @@ public static class OrderCompletionAdapter
             .Bind(configuration.GetSection("OrderCompletionAdapterSettings"))
             .ValidateDataAnnotations()
             .ValidateOnStart();
-
+        
+        services.Configure<OrderCompletionAdapterSettings>(options =>
+        {
+            options.MySqlServerAddress = Environment.GetEnvironmentVariable("MYSQL_SERVER") 
+                                         ?? options.MySqlServerAddress;
+            options.MySqlUsername = Environment.GetEnvironmentVariable("MYSQL_USER") 
+                                    ?? options.MySqlUsername;
+            options.MySqlPassword = Environment.GetEnvironmentVariable("MYSQL_PASSWORD") 
+                                    ?? options.MySqlPassword;
+        });
+        
         services.AddSingleton<ISystemClock, SystemClock>();
         services.AddSingleton<IMySqlConnectionFactory, MySqlConnectionFactory>();
         services.AddScoped<IOrderCompletionRepository, OrderCompletionRepository>();
