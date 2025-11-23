@@ -1,8 +1,10 @@
+using System.Data.Common;
 using Microsoft.Extensions.Options;
 using MySql.Data.MySqlClient;
-using OrderCompletion.Api.Adapters.OrderCompletionAdapter;
 
-public class MySqlConnectionFactory : IMySqlConnectionFactory
+namespace OrderCompletion.Api.Adapters.OrderCompletionAdapter;
+
+public class MySqlConnectionFactory : IDbConnectionFactory
 {
     private readonly string _connectionString;
 
@@ -20,5 +22,5 @@ public class MySqlConnectionFactory : IMySqlConnectionFactory
         }
     }
 
-    public MySqlConnection CreateConnection() => new MySqlConnection(_connectionString);
+    public DbConnection CreateConnection() => new MySqlConnection(_connectionString);
 }

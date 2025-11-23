@@ -24,7 +24,8 @@ public static class OrderCompletionAdapter
         });
         
         services.AddSingleton<ISystemClock, SystemClock>();
-        services.AddSingleton<IMySqlConnectionFactory, MySqlConnectionFactory>();
+        services.AddSingleton<IDbConnectionFactory, MySqlConnectionFactory>();
+        services.AddSingleton<ISqlDialect, MySqlDialect>();
         services.AddScoped<IOrderCompletionRepository, OrderCompletionRepository>();
     }
 }

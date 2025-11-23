@@ -1,4 +1,5 @@
-﻿using OrderCompletion.Api.Models;
+﻿using System.Data.Common;
+using OrderCompletion.Api.Models;
 using Dapper;
 using MySql.Data.MySqlClient;
 using OrderCompletion.Api.Adapters.OrderCompletionAdapter.Dtos;
@@ -9,13 +10,15 @@ namespace OrderCompletion.Api.Adapters.OrderCompletionAdapter;
 
 internal class OrderCompletionRepository : IOrderCompletionRepository
 {
-    private readonly IMySqlConnectionFactory _mySqlConnectionFactory;
+    private readonly IDbConnectionFactory _connectionFactory;
+    private readonly ISqlDialect _sqlDialect;
     private readonly ILogger<OrderCompletionRepository> _logger;
 
-    public OrderCompletionRepository(IMySqlConnectionFactory mySqlConnectionFactory,  ILogger<OrderCompletionRepository> Logger)
+    public OrderCompletionRepository(IDbConnectionFactory mySqlConnectionFactory, ISqlDialect sqlDialect, ILogger<OrderCompletionRepository> Logger)
     {
-        _mySqlConnectionFactory = mySqlConnectionFactory;
+        _connectionFactory = mySqlConnectionFactory;
         _logger = Logger;
+        _sqlDialect = sqlDialect;
     }
     
     public async Task<List<Order>> GetOrdersByIdAsync(IReadOnlyCollection<int> orderIds, CancellationToken ct = default)
@@ -27,7 +30,7 @@ internal class OrderCompletionRepository : IOrderCompletionRepository
 
         try
         {
-            await using var connection = _mySqlConnectionFactory.CreateConnection();
+            await using var connection = _connectionFactory.CreateConnection();
             await connection.OpenAsync(ct);
 
             List<OrderDto> orderDtos = await QueryOrders(orderIds, connection, ct);
@@ -67,12 +70,9 @@ internal class OrderCompletionRepository : IOrderCompletionRepository
         }    
     }
 
-    private async Task<List<OrderDto>> QueryOrders(IReadOnlyCollection<int> orderIds, MySqlConnection connection, CancellationToken ct)
+    private async Task<List<OrderDto>> QueryOrders(IReadOnlyCollection<int> orderIds, DbConnection connection, CancellationToken ct)
     {
-        const string orderQuery = @"
-        SELECT o.Id, o.OrderDate, o.OrderStateId
-        FROM ORDERS o
-        WHERE o.Id IN @Ids;";
+        string orderQuery = _sqlDialect.GetOrderIdsQuery();
 
         List<OrderDto> orderDtos = (await connection.QueryAsync<OrderDto>(
                 new CommandDefinition(orderQuery, new { Ids = orderIds }, cancellationToken: ct)))
@@ -82,12 +82,9 @@ internal class OrderCompletionRepository : IOrderCompletionRepository
     }
 
     private async Task<Dictionary<int, List<OrderLineDto>>> QueryLinesPerOrder(IReadOnlyCollection<int> orderIds,
-        MySqlConnection connection, CancellationToken ct)
+        DbConnection connection, CancellationToken ct)
     {
-        const string orderLinesQuery = @"
-        SELECT l.Id, l.OrderId, l.ProductId, l.OrderedQuantity, l.DeliveredQuantity
-        FROM ORDER_LINES l
-        WHERE l.OrderId IN @Ids;";
+        string orderLinesQuery = _sqlDialect.GetOrderLinesQuery();
 
         List<OrderLineDto> orderLineDtos = (await connection.QueryAsync<OrderLineDto>(
                 new CommandDefinition(orderLinesQuery, new { Ids = orderIds }, cancellationToken: ct)))
@@ -118,14 +115,10 @@ internal class OrderCompletionRepository : IOrderCompletionRepository
 
         try
         {
-            await using var connection = _mySqlConnectionFactory.CreateConnection();
+            await using var connection = _connectionFactory.CreateConnection();
             await connection.OpenAsync(ct);
 
-            const string query = @"
-                UPDATE ORDERS
-                SET OrderStateId = @FinishedState
-                WHERE Id IN @Ids
-                  AND OrderStateId = @SubmittedState;";    
+            string query = _sqlDialect.GetUpdateOrderStateQuery();
 
             var parameters = new
             {
