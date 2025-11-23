@@ -24,9 +24,9 @@
    - If this last query was successful we exit the service by sending Result.OK(body with some possible failed ids).
 
 Managers:
-- Singletons: IOrderRequirements, IDbConnectionFactory, ISqlDialect, ISystemClock, IAsyncPolicy 
-- Scoped: IOrderCompletionRepository, IOrderCompletionUseCase
-- Transient: 
+- Singletons (all of them stateless): IOrderRequirements, IDbConnectionFactory, ISqlDialect, ISystemClock, IAsyncPolicy 
+- Scoped : IOrderCompletionRepository, IOrderCompletionUseCase (in theory currently both can be singletons, as both are stateless, but prone to error in the future if refactored by using scoped services)
+- Transient: ---
 
 General Improvements:
 - If we want to switch the db we are connecting to, we can do that easily. It just needs to inherit from IDbConnectionFactory and implement the new DB query as a ISqlDialect class. Setup is in OrderCompletionAdapter.
@@ -35,7 +35,7 @@ General Improvements:
 - Improved security, by removing credentials (username and password for DB) from appsettings. 
 - All queries are idempotent, meaning that if we call the same query multiple times, the final state will be the same as executing it once. 
 
-- Edge cases:
+Edge cases:
 - If there is an old order, but without any order lines, the service will NOT mark it as complete. It will log a warning with the failure reason.
 - If there is an old order, with more delivered items, than requested, the service will mark the order as complete.
 
@@ -43,4 +43,4 @@ TODO:
  - Add retry mechanism to the OrderCompletionRepository class, when we do the querying the database.
  - In case we expect a lot of orders in the initial request, batch them and place them to be checked on different threads. 
  - Notifications are sent, one by one per order id (initial design of the service). Maybe a good optimization of the notifications service will be to make it send notifications to a batch of orders.
- - 
+ - Add behaviour tests for the NotificationService and the querying the database logic. 
