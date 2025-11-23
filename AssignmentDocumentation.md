@@ -32,4 +32,4 @@
 General Improvements:
 - 
 - Factory responsible only for generating the MySQL connection string.
-- 
+- Removed credentials (username and password) from appsettings. 
