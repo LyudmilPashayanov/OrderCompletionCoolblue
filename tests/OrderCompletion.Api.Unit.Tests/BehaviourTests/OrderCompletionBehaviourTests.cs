@@ -134,6 +134,37 @@ public class OrderCompletionBehaviourTests
         Assert.Contains(2, response.UnsuccessfullyNotifiedOrders);
     }
     
+    [Fact]
+    public async Task SingleOrder_OldWithoutOrderLines_ResponseIsCorrect()
+    {
+        // Arrange
+        var clock = new FakeClock(DateTime.UtcNow); 
+
+        var repo = new InMemoryOrderRepository();
+        
+        repo.Populate(GetOldNoOrderLinesOrder(clock, 1));
+
+        var notification = new FakeNotificationClient((order, token) => Task.FromResult(true));
+        
+        var sut = new OrderCompletionUseCase(
+            repo, 
+            notification, 
+            new IOrderRequirement[] 
+            { 
+                new FullyDeliveredRequirements(), 
+                new OrderAgeRequirement(clock),
+                new OrderNotFinishedRequirement()
+            },
+            NullLogger<OrderCompletionUseCase>.Instance);
+
+        // Act
+        var response = await sut.CompleteOrdersAsync(new[] { 1 }, CancellationToken.None);
+
+        //Assert
+        Assert.False(response.OrdersSuccessfullyUpdated);
+        Assert.Contains(1, response.FailedToUpdateOrders);
+    }
+    
     private Order GetOldCompletedOrder(ISystemClock clock, int orderId)
     {
         return new Order
@@ -176,6 +207,16 @@ public class OrderCompletionBehaviourTests
                 new OrderLine() { Id = 1, OrderedQuantity = 10, DeliveredQuantity = 10, ProductId = 3 },
                 new OrderLine() { Id = 2, OrderedQuantity = 3, DeliveredQuantity = 3, ProductId = 5 }
             }
+        };
+    }
+    
+    private Order GetOldNoOrderLinesOrder(ISystemClock clock, int orderId)
+    {
+        return new Order
+        {
+            Id = orderId,
+            OrderState = OrderState.Submitted,
+            OrderDate = clock.UtcNow.AddYears(-1)
         };
     }
 }

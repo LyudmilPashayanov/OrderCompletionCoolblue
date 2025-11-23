@@ -2,12 +2,12 @@ namespace OrderCompletion.Api.CustomExceptions;
 
 public sealed class NoOrdersSuccessfullyNotifiedException : Exception
 {
-    public List<int> AttemptedOrderIds { get; }
+    public VerificationAndNotificationResults FailedResults { get; }
 
     public NoOrdersSuccessfullyNotifiedException(
-        List<int> attemptedOrderIds)
-        : base($"No orders were successfully notified{string.Join(", ", attemptedOrderIds)}")
+        VerificationAndNotificationResults failedResults)
+        : base($"No orders were successfully notified{string.Join(", ", failedResults.UnsuccessfullyNotifiedOrders)}")
     {
-        AttemptedOrderIds = attemptedOrderIds;
+        FailedResults = failedResults;
     }
 }

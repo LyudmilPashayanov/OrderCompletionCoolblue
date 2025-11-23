@@ -1,4 +1,5 @@
-﻿using OrderCompletion.Api.CustomExceptions;
+﻿using Microsoft.AspNetCore.Components.Web;
+using OrderCompletion.Api.CustomExceptions;
 using OrderCompletion.Api.Models;
 using OrderCompletion.Api.OrderUseCaseRequirements;
 using OrderCompletion.Api.Ports;
@@ -47,6 +48,7 @@ public class OrderCompletionUseCase : IOrderCompletionUseCase
         }
         catch (NoOrdersSuccessfullyNotifiedException ex)
         {
+            PopulateResponseNotificationResults(response, ex.FailedResults);
             _logger.LogError(ex.Message);
         }
         catch (NoOrdersSuccessfullyUpdated ex)
@@ -91,7 +93,7 @@ public class OrderCompletionUseCase : IOrderCompletionUseCase
             {
                 ct.ThrowIfCancellationRequested(); // If cancellation is triggered, this line will gracefully stop the loop.
                 
-                bool notifiedSuccessfully = await ExecuteOrdersNotificationAsync(order.Id, ct);
+                bool notifiedSuccessfully = await NotifyOrdersCompletionAsync(order.Id, ct);
                 
                 if (notifiedSuccessfully)
                 {
@@ -111,7 +113,7 @@ public class OrderCompletionUseCase : IOrderCompletionUseCase
 
         if (verificationAndNotificationResults.SuccessfullyNotifiedOrders.Count == 0)
         {
-            throw new NoOrdersSuccessfullyNotifiedException(verificationAndNotificationResults.UnsuccessfullyNotifiedOrders);
+            throw new NoOrdersSuccessfullyNotifiedException(verificationAndNotificationResults);
         }
         
         return verificationAndNotificationResults;
@@ -141,7 +143,7 @@ public class OrderCompletionUseCase : IOrderCompletionUseCase
         return successfullyUpdatedOrders;
     }
 
-    private async Task<bool> ExecuteOrdersNotificationAsync(int orderId, CancellationToken ct)
+    private async Task<bool> NotifyOrdersCompletionAsync(int orderId, CancellationToken ct)
     {
         return await _notificationClient.NotifyOrderCompletedAsync(orderId, ct);
     }
@@ -165,7 +167,13 @@ public class OrderCompletionUseCase : IOrderCompletionUseCase
     {
         responseToPopulate.SuccessfullyNotifiedOrders = verificationAndNotificationResults.SuccessfullyNotifiedOrders;
         responseToPopulate.UnsuccessfullyNotifiedOrders = verificationAndNotificationResults.UnsuccessfullyNotifiedOrders;
-        responseToPopulate.FailedToUpdateOrders = verificationAndNotificationResults.FailedRequirementsOrders;
+        foreach (var orderId in verificationAndNotificationResults.FailedRequirementsOrders)
+        {
+            if (responseToPopulate.FailedToUpdateOrders.Contains(orderId) == false)
+            {
+                responseToPopulate.FailedToUpdateOrders.Add(orderId);
+            }
+        }
     }
     
     private void PopulateResponseUpdateOrdersResults(CompleteOrdersResponse responseToPopulate, VerificationAndNotificationResults verificationAndNotificationResults, bool ordersSuccessfullyUpdated)
@@ -173,7 +181,13 @@ public class OrderCompletionUseCase : IOrderCompletionUseCase
         responseToPopulate.OrdersSuccessfullyUpdated = ordersSuccessfullyUpdated;
         if (!ordersSuccessfullyUpdated)
         {
-            responseToPopulate.FailedToUpdateOrders = verificationAndNotificationResults.SuccessfullyNotifiedOrders;
+            foreach (var orderId in verificationAndNotificationResults.SuccessfullyNotifiedOrders)
+            {
+                if (responseToPopulate.FailedToUpdateOrders.Contains(orderId) == false)
+                {
+                    responseToPopulate.FailedToUpdateOrders.Add(orderId);
+                }
+            }
         }
     }
 }
