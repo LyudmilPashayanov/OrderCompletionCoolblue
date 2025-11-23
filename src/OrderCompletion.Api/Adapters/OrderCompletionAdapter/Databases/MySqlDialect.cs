@@ -1,4 +1,4 @@
-namespace OrderCompletion.Api.Adapters.OrderCompletionAdapter;
+namespace OrderCompletion.Api.Adapters.OrderCompletionAdapter.Databases;
 
 public class MySqlDialect : ISqlDialect
 {

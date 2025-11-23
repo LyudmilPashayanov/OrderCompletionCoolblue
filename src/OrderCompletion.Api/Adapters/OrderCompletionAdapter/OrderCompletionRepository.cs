@@ -2,6 +2,7 @@
 using OrderCompletion.Api.Models;
 using Dapper;
 using MySql.Data.MySqlClient;
+using OrderCompletion.Api.Adapters.OrderCompletionAdapter.Databases;
 using OrderCompletion.Api.Adapters.OrderCompletionAdapter.Dtos;
 using OrderCompletion.Api.Adapters.OrderCompletionAdapter.Mappers;
 using OrderCompletion.Api.Ports;

@@ -2,7 +2,7 @@ using System.Data.Common;
 using Microsoft.Extensions.Options;
 using MySql.Data.MySqlClient;
 
-namespace OrderCompletion.Api.Adapters.OrderCompletionAdapter;
+namespace OrderCompletion.Api.Adapters.OrderCompletionAdapter.Databases;
 
 public class MySqlConnectionFactory : IDbConnectionFactory
 {

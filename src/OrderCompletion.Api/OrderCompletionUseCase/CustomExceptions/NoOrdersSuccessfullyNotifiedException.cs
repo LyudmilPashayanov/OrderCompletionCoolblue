@@ -6,7 +6,7 @@ public sealed class NoOrdersSuccessfullyNotifiedException : Exception
 
     public NoOrdersSuccessfullyNotifiedException(
         List<int> attemptedOrderIds)
-        : base("No orders were successfully notified.")
+        : base($"No orders were successfully notified{string.Join(", ", attemptedOrderIds)}")
     {
         AttemptedOrderIds = attemptedOrderIds;
     }

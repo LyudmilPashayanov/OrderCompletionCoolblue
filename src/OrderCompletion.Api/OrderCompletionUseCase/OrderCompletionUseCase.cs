@@ -47,7 +47,7 @@ public class OrderCompletionUseCase : IOrderCompletionUseCase
         }
         catch (NoOrdersSuccessfullyNotifiedException ex)
         {
-            _logger.LogError(ex.Message + ex.AttemptedOrderIds);
+            _logger.LogError(ex.Message);
         }
         catch (NoOrdersSuccessfullyUpdated ex)
         {
@@ -152,7 +152,7 @@ public class OrderCompletionUseCase : IOrderCompletionUseCase
         {
             if (requirement.Fulfils(order) == false)
             {
-                _logger.LogDebug("Requested order with Id {OrderId} does not meet requirement: {RequirementName} to be completed.", order.Id, requirement.GetType());
+                _logger.LogWarning("Requested order with Id {OrderId} does not meet requirement- Failure reason: {Reason}.", order.Id, requirement.FailureReason);
                 return false;
             }
         }
