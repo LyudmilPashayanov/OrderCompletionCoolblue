@@ -30,6 +30,6 @@
    - If this last query was successful I send Result.OK(body with some failed ids).
 
 General Improvements:
-- 
+- If we want to switch the db we are connecting to, we can do that easily. It just needs to inherit from IDbConnectionFactory and implement the new DB query as a ISqlDialect class.
 - Factory responsible only for generating the MySQL connection string.
 - Removed credentials (username and password) from appsettings. 
